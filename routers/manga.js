@@ -267,7 +267,7 @@ router.get("/manga/popular/:pagenumber", async (req, res) => {
     const response = await AxiosService(url);
     const $ = cheerio.load(response.data);
     const element = $(".daftar");
-    let thumb, title, endpoint, type, upload_on;
+    let thumb, title, endpoint, type, upload_on, views;
     let manga_list = [];
     element.find(".bge").each((idx, el) => {
       title = $(el).find(".kan").find("h3").text().trim();
@@ -279,11 +279,13 @@ router.get("/manga/popular/:pagenumber", async (req, res) => {
       type = $(el).find("div.bgei > a > div.tpe1_inf > b").text();
       thumb = $(el).find("div.bgei > a > img").attr("data-src");
       upload_on = $(el).find("div.kan > p").text().split(".")[0].trim();
+      views = $(el).find("div.vw").text().trim();
       manga_list.push({
         title,
         type,
         thumb,
         endpoint,
+        views,
         upload_on,
       });
     });
@@ -309,10 +311,13 @@ router.get("/recommended", async (req, res) => {
     const $ = cheerio.load(response.data);
     const element = $("div.daftar > .bge");
     let manga_list = [];
-    let type, title, chapter, update, endpoint, thumb;
+    let type, title, chapter, update, endpoint, thumb, views;
     element.each((idx, el) => {
       title = $(el).find("div.kan > a > h3").text().trim();
+      type = $(el).find("div.tpe1_inf > b").text();
       thumb = $(el).find("div.bgei > a > img").attr("data-src");
+      views = $(el).find("div.vw").text().trim();
+      update = $(el).find("div.kan > p").text().split(".")[0].trim();
       endpoint = $(el)
         .find("div.kan > a")
         .attr("href")
@@ -324,6 +329,7 @@ router.get("/recommended", async (req, res) => {
         type,
         thumb,
         endpoint,
+        views,
         update,
       });
     });
