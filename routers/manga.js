@@ -26,7 +26,7 @@ router.get("/manga/page/:pagenumber", async (req, res) => {
       const $ = cheerio.load(response.data);
       const element = $(".perapih");
       let manga_list = [];
-      let title, type, updated_on, endpoint, thumb, chapter;
+      let title, type, updated_on, endpoint, thumb, chapter, desc;
 
       element.find(".daftar > .bge").each((idx, el) => {
         title = $(el).find(".kan > a").find("h3").text().trim();
@@ -34,6 +34,7 @@ router.get("/manga/page/:pagenumber", async (req, res) => {
         type = $(el).find(".bgei > a").find(".tpe1_inf > b").text();
         updated_on = $(el).find(".kan > span").text().split("• ")[1].trim();
         thumb = $(el).find(".bgei > a").find("img").attr("data-src");
+        desc = $(el).find(".kan > p").text().trim();
         chapter = $(el)
           .find("div.kan > div:nth-child(5) > a > span:nth-child(2)")
           .text();
@@ -44,6 +45,7 @@ router.get("/manga/page/:pagenumber", async (req, res) => {
           updated_on,
           endpoint,
           chapter,
+          desc,
         });
       });
       return res.status(200).json({
@@ -255,6 +257,54 @@ router.get("/genres/:slug/:pagenumber", async (req, res) => {
   }
 });
 
+// hot manga
+router.get("/manga/hot/:page", async (req, res) => {
+  const page = req.params.page;
+  const url = page === "1" 
+    ? `other/hot/?orderby=modified&category_name=manga/`
+    : `other/hot/page/${page}/?orderby=modified&category_name=manga/`;
+
+    try {
+      const response = await AxiosService(url);
+      const $ = cheerio.load(response.data);
+      const element = $(".daftar");
+      let thumb, title, endpoint, type, upload_on, views, title_id, short_desc, genre;
+      let manga_list = [];
+      element.find(".bge").each((idx, el) => {
+        title = $(el).find(".kan").find("h3").text().trim();
+        endpoint = $(el).find("a").attr("href").replace(replaceMangaPage, "").replace("/manga/", "");
+        genre = $(el).find("div.bgei > a > .tpe1_inf").text().split("\t").join('').trim();
+        thumb = $(el).find("div.bgei > a > img").attr("data-src");
+        upload_on = $(el).find("div.kan > p").text().split(".")[0].trim();
+        short_desc = $(el).find("div.kan > p").text().split(".")[1].trim();
+        views = $(el).find("div.vw").text().trim();
+        title_id = $(el).find("div.kan > span").text().trim();
+
+        manga_list.push({
+          title,
+          title_id,
+          genre,
+          thumb,
+          endpoint,
+          views,
+          short_desc,
+          upload_on,
+        });
+      });
+      res.json({
+        status: true,
+        message: "success",
+        manga_list,
+      });
+    }catch (error) {
+      res.send({
+        status: false,
+        message: error,
+        manga_list: [],
+      });
+    }
+});
+
 //manga popular pagination ----- Done ------
 router.get("/manga/popular/:pagenumber", async (req, res) => {
   const pagenumber = req.params.pagenumber;
@@ -303,6 +353,132 @@ router.get("/manga/popular/:pagenumber", async (req, res) => {
   }
 });
 
+
+// new update home
+router.get("/new-update", async(req, res) => {
+  try{
+    const response = await AxiosService();
+    const $ = cheerio.load(response.data);
+    const element = $("#Terbaru > .ls4w > .ls4");
+    let thumb, title, endpoint, type, upload_on, views, chapter;
+    let manga_list = [];
+
+    element.each((idx, el) => {
+      title = $(el).find("div.ls4j > h4").text();
+      thumb = $(el).find("div.ls4v > a > img").attr("data-src");
+      endpoint = $(el).find("div.ls4j > a").attr("href").split('/ch/').join('');
+      type = $(el).find("div.ls4j > span").text();
+      chapter = $(el).find("div.ls4j > a").text();
+      views = $(el).find("div.ls4v > .vm").text().trim();
+
+      manga_list.push({
+        title,
+        chapter,
+        endpoint,
+        thumb,
+        type,
+        upload_on,
+        views,
+      });
+    });
+
+    return res.json({
+      status: true,
+      message: "success",
+      manga_list,
+    });
+  }catch(error){
+    res.send({
+      status: false,
+      message: error,
+    });
+  }
+});
+
+// komik hot
+router.get("/komik/hot", async(req, res) => {
+  try{
+    const reponse = await AxiosService();
+    const $ = cheerio.load(reponse.data);
+    const element = $("#Komik_Hot > .perapih");
+    let thumb, title, endpoint, type, upload_on, views, genre, chapter, warna;
+    let manga_list = [];
+
+    element.find("div.ls112 > .ls12 > .ls2").each((idx, el) => {
+      title = $(el).find("div.ls2j > h4").text().trim();
+      endpoint = $(el).find("div.ls2j > a").attr("href").split('/ch/').join('');
+      chapter = $(el).find("div.ls2j > a").text();
+      thumb = $(el).find("a > img").attr("data-src");
+      type = $(el).find("div.ls2j > span").text().trim();
+      views = $(el).find("div.ls2v > .vw").text().trim();
+
+        manga_list.push({
+          title,
+          chapter,
+          endpoint,
+          thumb,
+          type,
+          upload_on,
+          views,
+      });
+    });
+
+    return res.json({
+      status: true,
+      message: "success",
+      manga_list,
+    });
+  }catch(error){
+    res.send({
+      status: false,
+      message: error,
+    });
+  }
+});
+
+// trending
+router.get("/trending", async(req,res) => {
+  try{
+    const response = await AxiosService();
+    const $ = cheerio.load(response.data);
+    const element = $("#Trending > .perapih > .ls123 > .ls23");
+    const element_top = $("#Trending > .cv");
+    let manga_list = [];
+    let manga_top = {};
+    let title, thumb, endpoint, release;
+
+    manga_top.title = element_top.find("div.ls12j > h3").text().trim();
+    manga_top.type = element_top.find("div.ls12j > span").text().trim();
+    manga_top.endpoint = element_top.find("a").attr("href").split('/ch/').join('').trim();
+
+    element.each((idx, el) => {
+        title = $(el).find("div.ls23j > a > h4").text().trim();
+        thumb = $(el).find("div.ls23v > a > img").attr("src");
+        endpoint = $(el).find("div.ls23j > a").attr("href").split('/ch/').join('').trim();
+        release = $(el).find("div.ls23j > a > .ls23t").text().split('- pembacaRilis perdana').join('Update').trim();
+
+        manga_list.push({
+          title,
+          thumb,
+          release,
+          endpoint,
+        });
+    });
+
+    return res.json({
+      status: true,
+      message: "success",
+      manga_top,
+      manga_list,
+    });
+
+  }catch (error) {
+    res.send({
+      message: error.message,
+    });
+  }
+});
+
 //recommended ---done---
 router.get("/recommended", async (req, res) => {
   try {
@@ -311,25 +487,29 @@ router.get("/recommended", async (req, res) => {
     const $ = cheerio.load(response.data);
     const element = $("div.daftar > .bge");
     let manga_list = [];
-    let type, title, chapter, update, endpoint, thumb, views;
+    let type, title, chapter, update, endpoint, thumb, views, short_desc, title_id;
+
+
     element.each((idx, el) => {
       title = $(el).find("div.kan > a > h3").text().trim();
-      type = $(el).find("div.tpe1_inf > b").text();
+      type = $(el).find("div.tpe1_inf").text().split('\t').join('').trim();
       thumb = $(el).find("div.bgei > a > img").attr("data-src");
       views = $(el).find("div.vw").text().trim();
       update = $(el).find("div.kan > p").text().split(".")[0].trim();
-      endpoint = $(el)
-        .find("div.kan > a")
-        .attr("href")
-        .replace("/manga/", "")
-        .replace(replaceMangaPage, "");
+      short_desc = $(el).find("div.kan > p").text().split(".")[1].trim();
+      title_id = $(el).find("div.kan > span").text().trim();
+
+      endpoint = $(el).find("div.kan > a").attr("href").split('https://komiku.id/manga/').join('');
+
       manga_list.push({
         title,
+        title_id,
         chapter,
         type,
         thumb,
         endpoint,
         views,
+        short_desc,
         update,
       });
     });
@@ -344,6 +524,7 @@ router.get("/recommended", async (req, res) => {
     });
   }
 });
+
 
 //manhua  ------Done------
 router.get("/manhua/:pagenumber", async (req, res) => {

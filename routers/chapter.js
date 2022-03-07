@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const cheerio = require("cheerio");
+const { empty } = require("cheerio/lib/api/manipulation");
 const axios = require("axios").default
 const AxiosService = require("../helpers/axiosService");
 
@@ -30,6 +31,15 @@ router.get("/:slug", async (req, res) => {
     getTitlePages.filter(() => {
       obj.title = $(getTitlePages).find("h1").text().replace("Komik ", "");
     });
+
+    let chapter_check = $(".pagination > a").attr("href");//.split('/ch/').join('').trim();
+    if(chapter_check != null){
+      obj.chapter_next = chapter_check.split('/ch/').join('').trim();
+    }else{
+      obj.chapter_next = null
+    }
+
+    // obj.chapter_next =
 
     /**
      * @Komiku
