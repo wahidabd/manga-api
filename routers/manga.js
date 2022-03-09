@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const cheerio = require("cheerio");
+const { text } = require("cheerio/lib/static");
 const baseUrl = require("../constants/urls");
 const replaceMangaPage = "https://komiku.id/manga/";
 const AxiosService = require("../helpers/axiosService");
@@ -16,8 +17,9 @@ router.get("/manga/page/:pagenumber", async (req, res) => {
   let pagenumber = req.params.pagenumber;
   let url =
     pagenumber === "1"
-      ? "https://data.komiku.id/pustaka/"
-      : `https://data.komiku.id/pustaka/page/${pagenumber}/`;
+      ? "https://data.komiku.id/pustaka/?orderby=modified&category_name=manga"
+      : `https://data.komiku.id/pustaka/page/${pagenumber}/?orderby=modified&category_name=manga`;
+
 
   try {
     const response = await AxiosService(url);
@@ -26,14 +28,15 @@ router.get("/manga/page/:pagenumber", async (req, res) => {
       const $ = cheerio.load(response.data);
       const element = $(".perapih");
       let manga_list = [];
-      let title, type, updated_on, endpoint, thumb, chapter, desc;
+      let title, type, updated_on, endpoint, thumb, chapter, desc, views;
 
       element.find(".daftar > .bge").each((idx, el) => {
         title = $(el).find(".kan > a").find("h3").text().trim();
         endpoint = $(el).find("a").attr("href").replace(replaceMangaPage, "");
-        type = $(el).find(".bgei > a").find(".tpe1_inf > b").text();
+        type = $(el).find(".bgei > a").find(".tpe1_inf").text().split("\t").join('').trim();
         updated_on = $(el).find(".kan > span").text().split("• ")[1].trim();
         thumb = $(el).find(".bgei > a").find("img").attr("data-src");
+        views = $(el).find(".kan > span").text().split("x •")[0].trim();
         desc = $(el).find(".kan > p").text().trim();
         chapter = $(el)
           .find("div.kan > div:nth-child(5) > a > span:nth-child(2)")
@@ -46,6 +49,7 @@ router.get("/manga/page/:pagenumber", async (req, res) => {
           endpoint,
           chapter,
           desc,
+          views,
         });
       });
       return res.status(200).json({
@@ -83,17 +87,19 @@ router.get("/manga/detail/:slug", async (req, res) => {
     const element = $(".perapih");
     let genre_list = [];
     let chapter = [];
+    let same_list = [];
     const obj = {};
 
     /* Get Title, Type, Author, Status */
     const getMeta = element.find(".inftable > tbody").first();
     obj.title = $("#Judul > h1").text().trim();
     obj.type = $("tr:nth-child(2) > td:nth-child(2)").find("b").text();
-    obj.author = $("#Informasi > table > tbody > tr:nth-child(4) > td:nth-child(2)")
-      .text()
-      .trim();
+    obj.author = $("#Informasi > table > tbody > tr:nth-child(4) > td:nth-child(2)").text().trim();
     obj.status = $(getMeta).children().eq(4).find("td:nth-child(2)").text();
-
+    obj.age_reader = $("#Informasi > table > tbody > tr:nth-child(6) > td:nth-child(2)").text().trim();
+    obj.views = $("#Informasi > table > tbody > tr:nth-child(7) > td:nth-child(2)").text().trim();
+    obj.konsep = $("#Informasi > table > tbody > tr:nth-child(3) > td:nth-child(2)").text().trim();
+    
     /* Set Manga Endpoint */
     obj.manga_endpoint = slug;
 
@@ -113,17 +119,42 @@ router.get("/manga/detail/:slug", async (req, res) => {
     const getSinopsis = element.find("#Sinopsis").first();
     obj.synopsis = $(getSinopsis).find("p").text().trim();
 
+    /* Get Same List */
+    const getSameList = element.find("#Spoiler").first();
+    $(getSameList).find(".grd").each((idx, el) => {
+      let same_title = $(el).find("a > .h4").text().split('\t').join('').trim();
+      let same_thumb = $(el).find("a > .gmbr1 > img").attr("data-src")
+      let same_type = $(el).find("a > .gmbr1 > .tpe1_inf").text().split("\t").join('').trim();
+      let same_views = $(el).find("a > .gmbr1 > .vw").text().trim();
+      let same_endpoint = $(el).find("a").attr("href").split("/manga/").join("").trim();
+      let same_desc = $(el).find("p").text().trim();
+
+      same_list.push({
+        same_title,
+        same_endpoint,
+        same_thumb,
+        same_type,
+        same_views,
+        same_desc,
+      });
+    });
+
+    obj.same_list = same_list || [];
+
     /* Get Chapter List */
     $("#Daftar_Chapter > tbody")
       .find("tr")
       .each((index, el) => {
         let chapter_title = $(el).find("a").text().trim();
         let chapter_endpoint = $(el).find("a").attr("href");
+        let chapter_release = $(el).find(".tanggalseries").text().trim();
+
         if (chapter_endpoint !== undefined) {
           const rep = chapter_endpoint.replace("/ch/", "");
           chapter.push({
             chapter_title,
             chapter_endpoint: rep,
+            chapter_release,
           });
         }
         obj.chapter = chapter;
@@ -261,34 +292,32 @@ router.get("/genres/:slug/:pagenumber", async (req, res) => {
 router.get("/manga/hot/:page", async (req, res) => {
   const page = req.params.page;
   const url = page === "1" 
-    ? `other/hot/?orderby=modified&category_name=manga/`
-    : `other/hot/page/${page}/?orderby=modified&category_name=manga/`;
+    ? `other/hot/`
+    : `other/hot/page/${page}/`;
 
     try {
       const response = await AxiosService(url);
       const $ = cheerio.load(response.data);
       const element = $(".daftar");
-      let thumb, title, endpoint, type, upload_on, views, title_id, short_desc, genre;
+      let thumb, title, endpoint, type, updated_on, views, desc, genre;
       let manga_list = [];
       element.find(".bge").each((idx, el) => {
         title = $(el).find(".kan").find("h3").text().trim();
         endpoint = $(el).find("a").attr("href").replace(replaceMangaPage, "").replace("/manga/", "");
-        genre = $(el).find("div.bgei > a > .tpe1_inf").text().split("\t").join('').trim();
+        type = $(el).find("div.bgei > a > .tpe1_inf").text().split("\t").join('').trim();
         thumb = $(el).find("div.bgei > a > img").attr("data-src");
-        upload_on = $(el).find("div.kan > p").text().split(".")[0].trim();
-        short_desc = $(el).find("div.kan > p").text().split(".")[1].trim();
+        updated_on = $(el).find("div.kan > p").text().split(".")[0].trim();
+        desc = $(el).find("div.kan > p").text().split(".")[1].trim();
         views = $(el).find("div.vw").text().trim();
-        title_id = $(el).find("div.kan > span").text().trim();
 
         manga_list.push({
           title,
-          title_id,
-          genre,
+          type,
           thumb,
           endpoint,
           views,
-          short_desc,
-          upload_on,
+          desc,
+          updated_on,
         });
       });
       res.json({
@@ -355,30 +384,41 @@ router.get("/manga/popular/:pagenumber", async (req, res) => {
 
 
 // new update home
-router.get("/new-update", async(req, res) => {
+router.get("/new-update/:pagenumber", async(req, res) => {
   try{
-    const response = await AxiosService();
+    const pagenumber = req.params.pagenumber;
+    const url =
+      pagenumber === "1"
+        ? `https://data.komiku.id/pustaka/`
+        : `https://data.komiku.id/pustaka/page/${pagenumber}/`;
+
+    const response = await AxiosService(url);
     const $ = cheerio.load(response.data);
-    const element = $("#Terbaru > .ls4w > .ls4");
-    let thumb, title, endpoint, type, upload_on, views, chapter;
+    const element = $(".daftar");
+    let thumb, title, endpoint, type, update, views;
     let manga_list = [];
 
-    element.each((idx, el) => {
-      title = $(el).find("div.ls4j > h4").text();
-      thumb = $(el).find("div.ls4v > a > img").attr("data-src");
-      endpoint = $(el).find("div.ls4j > a").attr("href").split('/ch/').join('');
-      type = $(el).find("div.ls4j > span").text();
-      chapter = $(el).find("div.ls4j > a").text();
-      views = $(el).find("div.ls4v > .vm").text().trim();
+    element.find(".bge").each((idx, el) => {
+      title = $(el).find(".kan").find("h3").text().trim();
+      endpoint = $(el)
+        .find("a")
+        .attr("href")
+        .replace(replaceMangaPage, "")
+        .replace("/manga/", "");
+      type = $(el).find("div.bgei > a > div.tpe1_inf > b").text();
+      thumb = $(el).find("div.bgei > a > img").attr("data-src");
+      desc = $(el).find("div.kan > p").text().split(".")[0].trim();
+      update = $(el).find(".kan > span").text().split("• ")[1].trim();
+      views = $(el).find(".kan > span").text().split("• ")[0].trim();
 
       manga_list.push({
         title,
-        chapter,
         endpoint,
         thumb,
         type,
-        upload_on,
+        update,
         views,
+        desc,
       });
     });
 
@@ -549,14 +589,16 @@ const getManhuaManhwa = async (req, res, type) => {
     const $ = cheerio.load(response.data);
     const element = $(".perapih");
     var manga_list = [];
-    var title, type, updated_on, endpoint, thumb, chapter;
+    var title, type, updated_on, endpoint, thumb, chapter, desc, views;
 
     element.find(".daftar > .bge").each((idx, el) => {
       title = $(el).find(".kan > a").find("h3").text().trim();
       endpoint = $(el).find("a").attr("href").replace(replaceMangaPage, "");
-      type = $(el).find(".bgei > a").find(".tpe1_inf > b").text().trim();
+      type = $(el).find(".bgei > a").find(".tpe1_inf").text().split('\t').join('').trim();
       updated_on = $(el).find(".kan > span").text().split("• ")[1].trim();
       thumb = $(el).find(".bgei > a").find("img").attr("data-src");
+      views = $(el).find(".kan > span").text().split("x •")[0].trim();
+      desc = $(el).find(".kan > p").text().trim();
       chapter = $(el)
         .find("div.kan > div:nth-child(5) > a > span:nth-child(2)")
         .text();
@@ -566,6 +608,8 @@ const getManhuaManhwa = async (req, res, type) => {
         type,
         updated_on,
         endpoint,
+        desc,
+        views,
         chapter,
       });
     });
