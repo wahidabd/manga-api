@@ -440,7 +440,7 @@ router.get("/komik/hot", async(req, res) => {
   try{
     const reponse = await AxiosService();
     const $ = cheerio.load(reponse.data);
-    const element = $("#Komik_Hot > .perapih");
+    const element = $(".ls > .perapih");
     let thumb, title, endpoint, type, upload_on, views, genre, chapter, warna;
     let manga_list = [];
 
